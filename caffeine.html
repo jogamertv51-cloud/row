@@ -462,6 +462,27 @@ main {
 }
 .log-del:hover { color: var(--red); }
 
+.log-time {
+  cursor: pointer;
+  border-bottom: 1px dashed rgba(255,255,255,0.2);
+  transition: color 0.15s, border-color 0.15s;
+}
+.log-time:hover { color: var(--caf); border-bottom-color: rgba(var(--caf-rgb),0.5); }
+
+.log-time-input {
+  background: rgba(var(--caf-rgb),0.1);
+  border: 1px solid rgba(var(--caf-rgb),0.4);
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  outline: none;
+  color-scheme: dark;
+  width: 78px;
+  vertical-align: baseline;
+}
+
 .log-empty {
   text-align: center;
   padding: 24px 0 8px;
@@ -1275,15 +1296,15 @@ function renderLoggedToday() {
   empty.style.display = 'none';
 
   el.innerHTML = tLogs.slice().reverse().map(log => {
-    const d   = new Date(log.ts);
-    const ms  = milestones(log);
+    const d    = new Date(log.ts);
+    const ms   = milestones(log);
     const logH = d.getHours() + d.getMinutes()/60;
     return `
       <div class="log-entry">
         <div class="log-entry-emoji">${log.e || '☕'}</div>
         <div class="log-entry-body">
           <div class="log-entry-name">${log.n}</div>
-          <div class="log-entry-meta">${log.mg} mg · ${fmtH(logH)}</div>
+          <div class="log-entry-meta">${log.mg} mg · <span class="log-time" data-id="${log.id}" title="Tap to edit time">${fmtH(logH)}</span></div>
           <div class="log-milestones">
             <span class="milestone peak">peak ${fmtH(ms.peakH)}</span>
             <span class="milestone half">½ gone ${fmtH(ms.halfH)}</span>
@@ -1301,6 +1322,40 @@ function renderLoggedToday() {
       logs = logs.filter(l => l.id !== id);
       saveLog();
       rerender();
+    });
+  });
+
+  el.querySelectorAll('.log-time').forEach(span => {
+    span.addEventListener('click', () => {
+      const id  = span.dataset.id;
+      const log = logs.find(l => l.id === id);
+      if (!log) return;
+      const d   = new Date(log.ts);
+      const hh  = String(d.getHours()).padStart(2, '0');
+      const mm  = String(d.getMinutes()).padStart(2, '0');
+
+      const inp = document.createElement('input');
+      inp.type      = 'time';
+      inp.value     = `${hh}:${mm}`;
+      inp.className = 'log-time-input';
+      span.replaceWith(inp);
+      inp.focus();
+
+      let cancelled = false;
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Enter')  inp.blur();
+        if (e.key === 'Escape') { cancelled = true; inp.blur(); }
+      });
+      inp.addEventListener('blur', () => {
+        if (!cancelled && inp.value) {
+          const [h, m] = inp.value.split(':').map(Number);
+          const nd = new Date(log.ts);
+          nd.setHours(h, m, 0, 0);
+          log.ts = nd.toISOString();
+          saveLog();
+        }
+        rerender();
+      });
     });
   });
 }
